@@ -1,0 +1,93 @@
+#!/bin/bash
+
+# Author: Claire Bradley; claire.bradley@uq.edu.au
+# This is a script for pre-processing of T1w MRIs. It does the following:
+# 1. Converts DICOMs to Nifti - ideally in BIDS format
+# 2. Generates BIDS-required .json files with acquisition information
+# 3. Further anonymizes the MRIs by defacing using pydeface
+# Written following directions from https://biabl.com/preprocessing-t1-images
+
+# Requires dcm2niix: (if you have anaconda installed)
+#conda update conda
+#conda update anaconda
+#conda install -c conda-forge dcm2niix
+
+# Requires pydeface, which in turns requires FSL, nibabel and nipype
+# https://github.com/poldracklab/pydeface
+
+# In terms of data: assumes that the relevant MRI data for each participant is in an MPRAGE folder, within their participant folder in the folder 'sourcedata'
+# Step 3 of script also assumes that any '.../data/subXX/anat' folder is populated with the converted Nifti file (result from Step 1 and 2)
+
+
+# ---------------- STEP 1 and 2: ----------------
+# Find the directories that are called MPRAGE and write their path to a .txt file that is easy to edit.
+# This allows for easy reprocessing of just a few participants
+find /Volumes/CBradleyQBI/TMS-EEG-Visual/data/sourcedata \
+-type d \
+-name "MPRAGE" > /Volumes/CBradleyQBI/TMS-EEG-Visual/data/sourcedata/MPRAGE_list.txt
+
+# Cut-up the paths to retain only information about the subject number (i.e. 'cut' by a certain field and erase character with 'sed')
+# This step is just a check-up and prints the results to the console. If you are happy with output, proceed further.
+for i in `cat /Volumes/CBradleyQBI/TMS-EEG-Visual/data/sourcedata/MPRAGE_list.txt`; do
+  subjid=`echo $i | cut -d "/" -f7 | cut -d "_" -f1 | sed 's/s//g'`
+  echo ${subjid}
+done
+
+# For all paths in the text file, retrieve the subject ID and convert to DICOM using dcm2niix, generating BIDS .json files
+for i in `cat /Volumes/CBradleyQBI/TMS-EEG-Visual/data/sourcedata/MPRAGE_list.txt`; do
+
+  # Same as above (if changed, update)
+  subjid=`echo $i | cut -d "/" -f7 | cut -d "_" -f1 | sed 's/s//g'`
+
+  # Make output directory (if it doesn't exist)
+  mkdir -p /Volumes/CBradleyQBI/TMS-EEG-Visual/data/sub-${subjid}/anat
+
+  # Run dcm2niix, with various options: -b for BIDS sidecar, -o output dir, -f new filename, -z no compression
+  dcm2niix \
+  -b y \
+  -o /Volumes/CBradleyQBI/TMS-EEG-Visual/data/sub-${subjid}/anat/ \
+  -f sub-${subjid}_T1w \
+  -z n \
+  $i
+
+done
+# Clean up
+rm /Volumes/CBradleyQBI/TMS-EEG-Visual/data/sourcedata/MPRAGE_list.txt
+
+
+# ---------------- STEP 3: Defacing ----------------
+# Data should be formatted correctly (BIDS) by steps 1 and 2
+
+# Find the directories that contain 'sub-' only within data (not within other subfolders) and write their path to a .txt file
+find /Volumes/CBradleyQBI/TMS-EEG-Visual/data \
+-mindepth 1 -maxdepth 1 \
+-type d \
+-name "sub-*" > /Volumes/CBradleyQBI/TMS-EEG-Visual/data/sub_list.txt
+
+# Cut-up the paths to retain only information about the subject number (i.e. 'cut' by a certain field)
+# This step is just a check-up and prints the results to the console
+for i in `cat /Volumes/CBradleyQBI/TMS-EEG-Visual/data/sub_list.txt`; do
+  subjid=`echo $i | cut -d "/" -f6 | cut -d "-" -f2`
+  echo ${subjid}
+  [ -d "/Volumes/CBradleyQBI/TMS-EEG-Visual/data/sub-${subjid}/anat" ] && echo "Anat folder exists."
+done
+
+# For all paths in the text file, retrieve the subject ID, check whether an /anat directory exists and if so, run the defacing
+for i in `cat /Volumes/CBradleyQBI/TMS-EEG-Visual/data/sub_list.txt`; do
+
+  # Same as above (if changed, update)
+  subjid=`echo $i | cut -d "/" -f6 | cut -d "-" -f2`
+
+  if [ -d "/Volumes/CBradleyQBI/TMS-EEG-Visual/data/sub-${subjid}/anat" ]
+    then
+      echo "Defacing sub-${subjid}"
+      # Run pydeface, with options: --outfile: same name as input file; --force: overwrite => the nifti file is defaced and no non-defaced file is stored
+      pydeface \
+      /Volumes/CBradleyQBI/TMS-EEG-Visual/data/sub-${subjid}/anat/sub-${subjid}_T1w.nii \
+      --outfile /Volumes/CBradleyQBI/TMS-EEG-Visual/data/sub-${subjid}/anat/sub-${subjid}_T1w.nii \
+      --force
+  fi
+
+done
+# Clean up
+rm /Volumes/CBradleyQBI/TMS-EEG-Visual/data/sub_list.txt
