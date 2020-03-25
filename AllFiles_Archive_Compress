@@ -4,7 +4,7 @@
 # Here are a few commands that I use to archive and compress files.
 # This allows for much more efficient storage on the servers, and supposedly better transfer (I have not experienced this myself yet)
 # The idea going forward is to run some computations in a temporary worspace (e.g.INode2), archive the results there, and transfer to UQ-RDM storage (e.g. /Volumes/XXX-QXXX), then delete from INode2.
-# Can also be used to archive and store (in archived form) on /Volumes/group_cogneuro/ClaireB. Ideally one copy of 'sourcedata', one copy of 'BIDSlikeraw' data and one copy of the results ('derivatives').
+# Ideally one copy of 'sourcedata', one copy of 'BIDSlikeraw' data and one copy of the results ('derivatives').
 
 
 ## ------- Taring a directory, with compression, while excluding some of its subdirectories or files
